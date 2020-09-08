@@ -52,7 +52,7 @@ class Helper {
 
 class Sudoku {
     /**
-     * Grid is a 3x3 mini-sudoku within a sudoku, there are 9 grids in a sudoku.
+     * Grid is a 3x3 box within a sudoku, there are 9 grids(boxes) in a sudoku.
      */
     constructor() {
         this.board = Helper.get2dArray(9, 9, 0);
@@ -61,6 +61,14 @@ class Sudoku {
         this.fillInBlanks = this.fillInBlanks.bind(this);
         this.fitsInCell = this.fitsInCell.bind(this);
         this.isFixedGrid = this.isFixedGrid.bind(this);
+        this.changeCell = this.changeCell.bind(this);
+
+        this.fixDiagonalGrids();
+        this.fillInBlanks();
+
+        this.state = {
+            board: [...(this.board.map(item => [...item]))]
+        }
     }
 
     fixDiagonalGrids() {
@@ -80,7 +88,7 @@ class Sudoku {
 
     isFixedGrid(row, col) {
         // if this grid is fixed (was filled as a diagonal grid)
-        let ret = (0 <= row && row < 3 && 0 <=  col && col < 3 || // first grid
+        let ret = (0 <= row && row < 3 && 0 <= col && col < 3 || // first grid
             3 <= row && row < 6 && 3 <= col && col < 6 || // fifth grid
             6 <= row && row < 9 && 6 <= col && col < 9  // ninth grid
         )
@@ -139,31 +147,81 @@ class Sudoku {
         return true;
     }
 
+    changeCell(row, col, number) {
+        // change state board cell by the given number
+        this.state.board[row][col] = number;
+    }
 }
 
 class UI {
-
     constructor() {
-        this.render = this.render.bind(this);
-        this.componentDidMount = this.componentDidMount.bind(this);
-        this.generateTable = this.generateTable.bind(this);
+        this.state = {}
 
-        this.sudoku = new Sudoku();
-        this.sudoku.fixDiagonalGrids();
-        this.sudoku.fillInBlanks();
+        this.setState = this.setState.bind(this);
+        this.render = this.render.bind(this);
     }
 
-    componentDidMount() {
+    setState(object) {
+        this.state = {...this.state, ...object};
+        this.render();
+    }
 
+    render() {
+
+    }
+}
+
+class Game extends UI {
+
+    constructor() {
+        super();
+        this.state = {
+            selectedCell: null
+        }
+
+        this.cellClickHandler = this.cellClickHandler.bind(this);
+        this.generateTable = this.generateTable.bind(this);
+        this.toggleSelectCell = this.toggleSelectCell.bind(this);
+        this.receiveNumber = this.receiveNumber.bind(this);
+
+        this.sudoku = new Sudoku();
+    }
+
+    receiveNumber(number) {
+        const [row, col] = this.state.selectedCell;
+        this.sudoku.changeCell(row, col, number);
+        this.render();
+        // console.log('received number', number);
+    }
+
+    toggleSelectCell(row, col) {
+        const {selectedCell} = this.state;
+        if (selectedCell && selectedCell[0] === row && selectedCell[1] === col) {
+            this.setState({selectedCell: null})
+        } else {
+            this.setState({selectedCell: [row, col]})
+        }
+    }
+
+    cellClickHandler(event) {
+        const clickedRow = event.target.getAttribute('data-row-id');
+        const clickedCol = event.target.getAttribute('data-col-id');
+        this.toggleSelectCell(parseInt(clickedRow), parseInt(clickedCol));
+        console.log('click handler', event.target.tagName === 'TD');
     }
 
     generateTable() {
         let ret = '<table cellspacing="0" cellpadding="0">';
         for (let i = 0; i < 9; i++) {
-            let row = `<tr data-row-id="${i}" id="row-${i}">`;
+            let row = `<tr  id="row-${i}">`;
             for (let j = 0; j < 9; j++) {
                 const gridNumber = Helper.getGridNumber(i, j);
-                row += `<td id="col-${j}" class="sudoku-cell grid-${gridNumber} grid-${gridNumber % 2 ? 'odd' : 'even'}">${this.sudoku.board[i][j]}</td>`;
+                const isSelected = this.state.selectedCell && this.state.selectedCell[0] === i && this.state.selectedCell[1] === j;
+                const classes = `sudoku-cell grid-${gridNumber} grid-${gridNumber % 2 ? 'odd' : 'even'} ${isSelected ? 'selected' : ''}`
+                row += `<td id="col-${j}" data-row-id="${i}" data-col-id="${j}" class="${classes}" onclick="game.cellClickHandler(event);">
+                        ${this.sudoku.state.board[i][j]}
+                        </td>
+                        `;
             }
             row += `</tr>`;
             ret += row;
@@ -173,10 +231,79 @@ class UI {
     }
 
     render() {
-        const newTable = this.generateTable();
-        // console.log('new table', newTable);
-        document.querySelector('#sudoku-container').innerHTML = newTable;
+        console.log(this.state.selectedCell);
+        document.querySelector('#sudoku-container').innerHTML = this.generateTable();
     }
 }
 
-new UI().render();
+
+class NumPad extends UI {
+    constructor(game) {
+        super();
+        this.game = game;
+
+        this.dispatchNumber = this.dispatchNumber.bind(this);
+        this.generateNumpad = this.generateNumpad.bind(this);
+        this.buttonClickHandler = this.buttonClickHandler.bind(this);
+    }
+
+    dispatchNumber(number) {
+        this.game.receiveNumber(number);
+    }
+
+    buttonClickHandler(event) {
+        const number = parseInt(event.target.textContent);
+        this.dispatchNumber(number);
+    }
+
+    generateNumpad() {
+        let ret = '<table>'
+        for (let i = 0; i < 3; i++) {
+            let row = '<tr>'
+            for (let j = 0; j < 3; j++) {
+                row += `<td onclick="numpad.buttonClickHandler(event);">${i * 3 + j + 1}</td>`
+            }
+            row += '</tr>'
+            ret += row;
+        }
+        ret += '</table>'
+        return ret;
+    }
+
+    render() {
+        document.querySelector('#numpad-container').innerHTML = this.generateNumpad();
+    }
+}
+
+
+class Hydration {
+    constructor(game) {
+        this.game = game;
+        this.dispatchNumber = this.dispatchNumber.bind(this);
+        this.hydrate = this.hydrate.bind(this);
+
+    }
+
+    dispatchNumber(number) {
+        this.game.receiveNumber(number);
+    }
+
+    hydrate() {
+        document.addEventListener('keypress', e => {
+            if (49 <= e.keyCode && e.keyCode <= 57) {
+                const num = parseInt(e.key);
+                this.dispatchNumber(num);
+            }
+        })
+    }
+}
+
+
+const game = new Game()
+game.render();
+
+const numpad = new NumPad(game);
+numpad.render();
+
+const hydration = new Hydration(game);
+hydration.hydrate();

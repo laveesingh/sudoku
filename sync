@@ -1,0 +1,5 @@
+#!/bin/sh
+
+rsync -azrvce "ssh -i ~/.ssh/lsaws032_bastion.pem" ./*  ubuntu@3.15.235.91:/var/www/sudoku/ --exclude .git
+
+
