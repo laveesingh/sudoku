@@ -54,6 +54,14 @@ class Sudoku {
     /**
      * Grid is a 3x3 box within a sudoku, there are 9 grids(boxes) in a sudoku.
      */
+    TOTAL_ELEMENTS = 81
+    EASY_ELEMENTS = 45
+    MEDIUM_ELEMENTS = 35
+    HARD_ELEMENTS = 25
+
+    LEVEL = 'EASY'
+
+
     constructor() {
         this.board = Helper.get2dArray(9, 9, 0);
         this.fixDiagonalGrids = this.fixDiagonalGrids.bind(this);
@@ -62,6 +70,9 @@ class Sudoku {
         this.fitsInCell = this.fitsInCell.bind(this);
         this.isFixedGrid = this.isFixedGrid.bind(this);
         this.changeCell = this.changeCell.bind(this);
+        this.removePuzzleElements = this.removePuzzleElements.bind(this);
+        this.clearBoardCell = this.clearBoardCell.bind(this);
+        this.getRemovalCount = this.getRemovalCount.bind(this);
 
         this.fixDiagonalGrids();
         this.fillInBlanks();
@@ -69,7 +80,13 @@ class Sudoku {
         this.state = {
             board: [...(this.board.map(item => [...item]))]
         }
+
+        this.removePuzzleElements()
     }
+
+    /**
+     * Work with the main board
+     */
 
     fixDiagonalGrids() {
         this.fillArrayToGrid(0, 0, Helper.shuffleArray(Helper.getRange(9))); // first grid
@@ -147,6 +164,40 @@ class Sudoku {
         return true;
     }
 
+
+    /**
+     * Work with the board state
+     */
+
+    getRemovalCount() {
+        let removalCount = 0;
+        if (this.LEVEL === 'EASY') {
+            removalCount = this.TOTAL_ELEMENTS - this.EASY_ELEMENTS;
+        } else if (this.LEVEL === 'MEDIUM') {
+            removalCount = this.TOTAL_ELEMENTS - this.MEDIUM_ELEMENTS;
+        } else {
+            removalCount = this.TOTAL_ELEMENTS - this.HARD_ELEMENTS;
+        }
+        return removalCount;
+    }
+
+    removePuzzleElements() {
+        console.log('current board', this.state.board)
+        let removalCount = this.getRemovalCount();
+        while (removalCount > 0) {
+            const row = Helper.getRandomNumber(9) - 1
+            const col = Helper.getRandomNumber(9) - 1
+            if (this.state.board[row][col] !== 0) {
+                removalCount -= 1;
+                this.clearBoardCell(row, col);
+            }
+        }
+    }
+
+    clearBoardCell(row, col) {
+        this.changeCell(row, col, 0);
+    }
+
     changeCell(row, col, number) {
         // change state board cell by the given number
         this.state.board[row][col] = number;
@@ -188,6 +239,9 @@ class Game extends UI {
     }
 
     receiveNumber(number) {
+        if (!this.state.selectedCell) {
+            return;
+        }
         const [row, col] = this.state.selectedCell;
         this.sudoku.changeCell(row, col, number);
         this.render();
@@ -219,7 +273,7 @@ class Game extends UI {
                 const isSelected = this.state.selectedCell && this.state.selectedCell[0] === i && this.state.selectedCell[1] === j;
                 const classes = `sudoku-cell grid-${gridNumber} grid-${gridNumber % 2 ? 'odd' : 'even'} ${isSelected ? 'selected' : ''}`
                 row += `<td id="col-${j}" data-row-id="${i}" data-col-id="${j}" class="${classes}" onclick="game.cellClickHandler(event);">
-                        ${this.sudoku.state.board[i][j]}
+                        ${this.sudoku.state.board[i][j] || ''}
                         </td>
                         `;
             }
